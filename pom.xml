@@ -1815,6 +1815,12 @@
                 <groupId>org.wildfly.security</groupId>
                 <artifactId>wildfly-elytron-encryption</artifactId>
                 <version>${version.org.wildfly.security.elytron}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.wildfly.security</groupId>
@@ -1960,6 +1966,12 @@
                 <groupId>org.wildfly.security</groupId>
                 <artifactId>wildfly-elytron-realm</artifactId>
                 <version>${version.org.wildfly.security.elytron}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.wildfly.security</groupId>

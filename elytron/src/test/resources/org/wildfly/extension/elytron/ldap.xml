@@ -39,6 +39,10 @@
             <x509-credential-mapper digest-from="x509digest" certificate-from="usercertificate" subject-dn-from="x509subject" serial-number-from="x509serialNumber" />
          </identity-mapping>
       </ldap-realm>
+      <ldap-realm name="LdapRealmInsecure" dir-context="DirContextSimple" direct-verification="true">
+         <identity-mapping filter-name="(|(objectclass=referral)(uid={0}))" iterator-filter="(uid=*)" new-identity-parent-dn="dc=users,dc=elytron,dc=wildfly,dc=org" rdn-identifier="uid" search-base-dn="dc=users,dc=elytron,dc=wildfly,dc=org" use-recursive-search="true">
+         </identity-mapping>
+      </ldap-realm>
       <ldap-realm name="LdapRealmDirectVerification" dir-context="DirContextSsl" direct-verification="true" allow-blank-password="true">
          <identity-mapping filter-name="(|(objectclass=referral)(uid={0}))" iterator-filter="(uid=*)" new-identity-parent-dn="dc=users,dc=elytron,dc=wildfly,dc=org" rdn-identifier="uid" search-base-dn="dc=users,dc=elytron,dc=wildfly,dc=org" use-recursive-search="true">
          </identity-mapping>
@@ -100,7 +104,8 @@
       </client-ssl-contexts>
    </tls>
    <dir-contexts>
-      <dir-context authentication-level="none" authentication-context="ldapAuthContext" name="DirContextInsecure" url="ldap://localhost:11391/"/>
+      <dir-context authentication-level="none" authentication-context="ldapAuthContext" name="DirContextInsecure" url="ldaps://localhost:11391/"/>
+      <dir-context name="DirContextSimple" url="ldaps://localhost:11391/"/>
       <dir-context name="DirContextSsl" authentication-context="ldapAuthContext" referral-mode="throw" url="ldaps://localhost:11391/" connection-timeout="6000" read-timeout="10000">
          <properties>
             <property name="java.naming.dns.url" value="dns://dnsserver/wiz.com"/>

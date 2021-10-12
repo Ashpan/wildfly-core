@@ -296,6 +296,18 @@ public class LdapTestCase extends AbstractSubsystemTest {
     }
 
     @Test
+    public void testLdapRealmDirectVerificationInsecure() throws Exception {
+        ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("LdapRealmInsecure");
+        ModifiableSecurityRealm securityRealm = (ModifiableSecurityRealm) services.getContainer().getService(serviceName).getValue();
+        Assert.assertNotNull(securityRealm);
+
+        RealmIdentity identity1 = securityRealm.getRealmIdentity(new NamePrincipal("plainUser"));
+        Assert.assertTrue(identity1.exists());
+        Assert.assertTrue(identity1.verifyEvidence(new PasswordGuessEvidence("plainPassword".toCharArray())));
+        identity1.dispose();
+    }
+
+    @Test
     public void testLdapRealmDirectVerification() throws Exception {
         ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("LdapRealmDirectVerification");
         ModifiableSecurityRealm securityRealm = (ModifiableSecurityRealm) services.getContainer().getService(serviceName).getValue();

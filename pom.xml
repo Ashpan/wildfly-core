@@ -131,36 +131,38 @@
         <wildfly.core.scm.url>https://github.com/wildfly/wildfly-core</wildfly.core.scm.url>
 
         <!-- WildFly Preview vs standard WildFly GAV expression properties.
-             Used to drive maven-resource-plugin filtering for module.xml files
-             where WildFly Preview and standard WildFly use different artifacts but
-             otherwise identical module.xml files. The expression encapsulates the part
-             of a groupId/artifactId/classifier that differs in the two dists.
-             Values here are the ones used by standard WildFly; WildFly Preview child
-             modules will override. Often the standard value will be an empty string
-             and WildFly Preview will change it to additional text a project uses to
-             identify its jakarta.* namespace artifacts.
-             -->
+        Used to drive maven-resource-plugin filtering for module.xml files
+        where WildFly Preview and standard WildFly use different artifacts but
+        otherwise identical module.xml files. The expression encapsulates the part
+        of a groupId/artifactId/classifier that differs in the two dists.
+        Values here are the ones used by standard WildFly; WildFly Preview child
+        modules will override. Often the standard value will be an empty string
+        and WildFly Preview will change it to additional text a project uses to
+        identify its jakarta.* namespace artifacts.
+        -->
         <module.jakarta.classifier></module.jakarta.classifier>
         <module.jakarta.suffix></module.jakarta.suffix>
 
         <!--
-            Dependency versions. Please keep alphabetical.
-            you can automatically sort it by running
-            mvn com.github.ekryd.sortpom:sortpom-maven-plugin:2.8.0:sort  -Dsort.sortProperties=true -Dsort.nrOfIndentSpace=4 -Dsort.keepBlankLines=true -Dsort.sortDependencies=scope,groupId,artifactId
+        Dependency versions. Please keep alphabetical.
+        you can automatically sort it by running
+        mvn com.github.ekryd.sortpom:sortpom-maven-plugin:2.8.0:sort  -Dsort.sortProperties=true -Dsort.nrOfIndentSpace=4 -Dsort.keepBlankLines=true -Dsort.sortDependencies=scope,groupId,artifactId
 
-            Each version property should be of the form "version.<groupId>".
-            For example: <version.org.jboss.as>
+        Each version property should be of the form "version.<groupId>".
+        For example: <version.org.jboss.as>
 
-            In cases where multiple artifacts use the same groupId but have different
-            versions, add the artifactId or other qualifier to the property name.
-            For example: <version.org.jboss.hal.release-stream>
-         -->
+        In cases where multiple artifacts use the same groupId but have different
+        versions, add the artifactId or other qualifier to the property name.
+        For example: <version.org.jboss.hal.release-stream>
+        -->
         <version.com.googlecode.javaewah>1.1.13</version.com.googlecode.javaewah>
         <version.com.google.code.findbugs>3.0.2</version.com.google.code.findbugs>
         <version.com.google.guava>30.1.1-jre</version.com.google.guava>
         <version.com.google.guava.failureaccess>1.0.1</version.com.google.guava.failureaccess>
         <version.com.jcraft.jsch>0.1.55</version.com.jcraft.jsch>
+        <version.commons-cli>1.4</version.commons-cli>
         <version.commons-lang>2.6</version.commons-lang>
+        <version.commons-lang3>3.11</version.commons-lang3>
         <version.io.undertow>2.2.13.Final</version.io.undertow>
         <version.jakarta.inject.jakarta.inject-api>1.0.5</version.jakarta.inject.jakarta.inject-api>
         <version.jakarta.json.jakarta-json-api>1.1.6</version.jakarta.json.jakarta-json-api>
@@ -728,6 +730,11 @@
                 <version>${version.com.google.guava.failureaccess}</version>
              </dependency>
             <dependency>
+                <groupId>commons-cli</groupId>
+                <artifactId>commons-cli</artifactId>
+                <version>${version.commons-cli}</version>
+            </dependency>
+            <dependency>
                 <groupId>commons-lang</groupId>
                 <artifactId>commons-lang</artifactId>
                 <version>${version.commons-lang}</version>
@@ -841,6 +848,11 @@
                 <version>${version.org.aesh-readline}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${version.commons-lang3}</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>

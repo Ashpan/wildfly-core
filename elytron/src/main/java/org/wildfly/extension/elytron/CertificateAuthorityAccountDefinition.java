@@ -422,7 +422,6 @@ class CertificateAuthorityAccountDefinition extends SimpleResourceDefinition {
     static ModifiableKeyStoreService getModifiableKeyStoreService(ServiceRegistry serviceRegistry, String keyStoreName) throws OperationFailedException {
         RuntimeCapability<Void> runtimeCapability = KEY_STORE_RUNTIME_CAPABILITY.fromBaseCapability(keyStoreName);
         ServiceName serviceName = runtimeCapability.getCapabilityServiceName();
-
         ServiceController<KeyStore> serviceContainer = getRequiredService(serviceRegistry, serviceName, KeyStore.class);
         ServiceController.State serviceState = serviceContainer.getState();
         if (serviceState != ServiceController.State.UP) {

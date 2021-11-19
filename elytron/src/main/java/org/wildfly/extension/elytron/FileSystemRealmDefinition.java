@@ -21,6 +21,7 @@ package org.wildfly.extension.elytron;
 import static org.jboss.as.controller.capability.RuntimeCapability.buildDynamicCapabilityName;
 import static org.wildfly.extension.elytron.Capabilities.CREDENTIAL_STORE_API_CAPABILITY;
 import static org.wildfly.extension.elytron.Capabilities.CREDENTIAL_STORE_CAPABILITY;
+import static org.wildfly.extension.elytron.Capabilities.KEY_STORE_CAPABILITY;
 import static org.wildfly.extension.elytron.Capabilities.MODIFIABLE_SECURITY_REALM_RUNTIME_CAPABILITY;
 import static org.wildfly.extension.elytron.Capabilities.SECURITY_REALM_CAPABILITY;
 import static org.wildfly.extension.elytron.Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY;
@@ -29,11 +30,17 @@ import static org.wildfly.extension.elytron.ElytronDescriptionConstants.HEX;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.UTF_8;
 import static org.wildfly.extension.elytron.FileAttributeDefinitions.pathName;
 import static org.wildfly.extension.elytron.FileAttributeDefinitions.pathResolver;
+import static org.wildfly.extension.elytron.KeyStoreServiceUtil.getModifiableKeyStoreService;
 import static org.wildfly.extension.elytron._private.ElytronSubsystemMessages.ROOT_LOGGER;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.UnrecoverableKeyException;
 import javax.crypto.SecretKey;
 
 import org.jboss.as.controller.AbstractAddStepHandler;
@@ -58,16 +65,19 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.value.InjectedValue;
 import org.wildfly.common.function.ExceptionFunction;
+import org.wildfly.common.function.ExceptionSupplier;
 import org.wildfly.extension.elytron.FileAttributeDefinitions.PathResolver;
 import org.wildfly.security.auth.realm.FileSystemSecurityRealm;
 import org.wildfly.security.auth.realm.FileSystemSecurityRealmBuilder;
 import org.wildfly.security.auth.server.NameRewriter;
 import org.wildfly.security.auth.server.SecurityRealm;
 import org.wildfly.security.credential.SecretKeyCredential;
+import org.wildfly.security.credential.source.CredentialSource;
 import org.wildfly.security.credential.store.CredentialStore;
 import org.wildfly.security.credential.store.CredentialStoreException;
 import org.wildfly.security.password.spec.Encoding;
@@ -140,7 +150,27 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                     .setRestartAllServices()
                     .build();
 
-    static final AttributeDefinition[] ATTRIBUTES = new AttributeDefinition[]{PATH, RELATIVE_TO, LEVELS, ENCODED, HASH_ENCODING, HASH_CHARSET, CREDENTIAL_STORE, SECRET_KEY};
+    static final SimpleAttributeDefinition KEY_STORE =
+            new SimpleAttributeDefinitionBuilder(ElytronDescriptionConstants.KEY_STORE, ModelType.STRING, false)
+                    .setAllowExpression(true)
+                    .setRequired(false)
+                    .setRequires(ElytronDescriptionConstants.KEY_STORE_ALIAS)
+                    .setMinSize(1)
+                    .setRestartAllServices()
+                    .setCapabilityReference(KEY_STORE_CAPABILITY, SECURITY_REALM_CAPABILITY, true)
+                    .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+                    .build();
+
+    static final SimpleAttributeDefinition KEY_STORE_ALIAS =
+            new SimpleAttributeDefinitionBuilder(ElytronDescriptionConstants.KEY_STORE_ALIAS, ModelType.STRING, false)
+                    .setAllowExpression(true)
+                    .setRequired(false)
+                    .setRequires(ElytronDescriptionConstants.KEY_STORE)
+                    .setMinSize(1)
+                    .setRestartAllServices()
+                    .build();
+
+    static final AttributeDefinition[] ATTRIBUTES = new AttributeDefinition[]{PATH, RELATIVE_TO, LEVELS, ENCODED, HASH_ENCODING, HASH_CHARSET, CREDENTIAL_STORE, SECRET_KEY, KEY_STORE, KEY_STORE_ALIAS};
 
     private static final AbstractAddStepHandler ADD = new RealmAddHandler();
     private static final OperationStepHandler REMOVE = new TrivialCapabilityServiceRemoveHandler(ADD, MODIFIABLE_SECURITY_REALM_RUNTIME_CAPABILITY, SECURITY_REALM_RUNTIME_CAPABILITY);
@@ -169,7 +199,7 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             super(SECURITY_REALM_RUNTIME_CAPABILITY, ATTRIBUTES);
         }
 
-        private SecretKey getKey(OperationContext context, String credentialStoreReference, String alias) throws OperationFailedException{
+        private static SecretKey getSecretKey(OperationContext context, String credentialStoreReference, String alias) throws OperationFailedException {
             ExceptionFunction<OperationContext, CredentialStore, OperationFailedException> credentialStoreApi = context.getCapabilityRuntimeAPI(CREDENTIAL_STORE_API_CAPABILITY, credentialStoreReference, ExceptionFunction.class);
             CredentialStore credentialStoreResource = credentialStoreApi.apply(context);
             try {
@@ -180,6 +210,14 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                 return credential.getSecretKey();
             } catch (CredentialStoreException e) {
                 throw ROOT_LOGGER.unableToLoadCredentialStore(e);
+            }
+        }
+        private static char[] getKeyStorePassword(KeyStoreService keyStoreService) throws RuntimeException {
+            InjectedValue<ExceptionSupplier<CredentialSource, Exception>> credentialSourceSupplierInjector = new InjectedValue<>();
+            try {
+                return keyStoreService.resolveKeyPassword(credentialSourceSupplierInjector.getOptionalValue());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
 
@@ -193,33 +231,35 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             ServiceName aliasServiceName = SECURITY_REALM_RUNTIME_CAPABILITY.fromBaseCapability(address).getCapabilityServiceName();
 
             final int levels = LEVELS.resolveModelAttribute(context, model).asInt();
-
             final boolean encoded = ENCODED.resolveModelAttribute(context, model).asBoolean();
-
             final String path = PATH.resolveModelAttribute(context, model).asString();
             final String relativeTo = RELATIVE_TO.resolveModelAttribute(context, model).asStringOrNull();
-
             final String hashEncoding = HASH_ENCODING.resolveModelAttribute(context, model).asString();
             final String hashCharset = HASH_CHARSET.resolveModelAttribute(context, model).asString();
             final String credentialStore = CREDENTIAL_STORE.resolveModelAttribute(context, model).asStringOrNull();
             final String secretKey = SECRET_KEY.resolveModelAttribute(context, model).asStringOrNull();
+            final String keyStoreName = KEY_STORE.resolveModelAttribute(context, model).asStringOrNull();
+            final String keyPairAlias = KEY_STORE_ALIAS.resolveModelAttribute(context, model).asStringOrNull();
 
-            SecretKey key = null;
-            if(credentialStore != null && secretKey != null) {
-                key = getKey(context, credentialStore, secretKey);
-            }
-            SecretKey finalKey = key;
-
+            final InjectedValue<KeyStore> keyStoreInjector = new InjectedValue<>();
             final InjectedValue<PathManager> pathManagerInjector = new InjectedValue<>();
             final InjectedValue<NameRewriter> nameRewriterInjector = new InjectedValue<>();
+
+            SecretKey key = null;
+            if (credentialStore != null && secretKey != null) {
+                key = getSecretKey(context, credentialStore, secretKey);
+            }
+            final SecretKey finalKey = key;
+            ServiceRegistry keyStoreServiceRegistry = context.getServiceRegistry(true);
 
             TrivialService<SecurityRealm> fileSystemRealmService = new TrivialService<>(
                     new TrivialService.ValueSupplier<SecurityRealm>() {
 
                         private PathResolver pathResolver;
-
+                        ModifiableKeyStoreService keyStoreService;
                         @Override
                         public SecurityRealm get() throws StartException {
+
                             pathResolver = pathResolver();
                             Path rootPath = pathResolver.path(path).relativeTo(relativeTo, pathManagerInjector.getOptionalValue()).resolve().toPath();
 
@@ -229,6 +269,23 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                             if (nameRewriter == null) {
                                 nameRewriter = NameRewriter.IDENTITY_REWRITER;
                             }
+                            KeyStore keyStore = keyStoreInjector.getOptionalValue();
+                            PrivateKey privateKey = null;
+                            PublicKey publicKey = null;
+                            if (keyStore != null) {
+                                    try {
+                                        keyStoreService = getModifiableKeyStoreService(keyStoreServiceRegistry, keyStoreName);
+                                        char[] keyPassword = getKeyStorePassword((KeyStoreService) keyStoreService);
+                                        privateKey = (PrivateKey) keyStore.getKey(keyPairAlias, keyPassword);
+                                        publicKey = keyStore.getCertificate(keyPairAlias).getPublicKey();
+                                        if (privateKey == null ^ publicKey == null) {
+                                           throw ROOT_LOGGER.invalidKeyPair(keyStoreName, keyPairAlias);
+                                        }
+                                    } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | OperationFailedException e) {
+                                        throw ROOT_LOGGER.unableToAccessEntryFromKeyStore(keyPairAlias, keyStoreName);
+                                    }
+                            }
+
                             FileSystemSecurityRealmBuilder fileSystemRealmBuilder = FileSystemSecurityRealm.builder()
                                     .setRoot(rootPath)
                                     .setNameRewriter(nameRewriter)
@@ -241,8 +298,11 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                                 fileSystemRealmBuilder.setSecretKey(finalKey);
                             }
 
+                            if (privateKey != null && publicKey != null) {
+                                fileSystemRealmBuilder.setPrivateKey(privateKey);
+                                fileSystemRealmBuilder.setPublicKey(publicKey);
+                            }
                             return fileSystemRealmBuilder.build();
-
                         }
 
                         @Override
@@ -260,7 +320,11 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             if (credentialStore != null) {
                 serviceBuilder.requires(context.getCapabilityServiceName(buildDynamicCapabilityName(CREDENTIAL_STORE_CAPABILITY, credentialStore), CredentialStore.class));
             }
-
+            if (keyStoreName != null) {
+                serviceBuilder.addDependency(context.getCapabilityServiceName(
+                        buildDynamicCapabilityName(KEY_STORE_CAPABILITY, keyStoreName), KeyStore.class),
+                        KeyStore.class, keyStoreInjector);
+            }
             if (relativeTo != null) {
                 serviceBuilder.addDependency(PathManagerService.SERVICE_NAME, PathManager.class, pathManagerInjector);
                 serviceBuilder.requires(pathName(relativeTo));

@@ -17,12 +17,35 @@
  */
 package org.wildfly.extension.elytron;
 
-import org.jboss.as.controller.client.helpers.ClientConstants;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.security.AccessController;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.Provider;
+import java.security.Security;
+import java.security.spec.KeySpec;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.subsystem.test.AbstractSubsystemBaseTest;
 import org.jboss.as.subsystem.test.KernelServices;
 import org.jboss.dmr.ModelNode;
@@ -32,9 +55,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.wildfly.common.iteration.ByteIterator;
-import org.wildfly.security.auth.permission.LoginPermission;
 import org.wildfly.common.iteration.CodePointIterator;
 import org.wildfly.security.WildFlyElytronProvider;
+import org.wildfly.security.auth.permission.LoginPermission;
 import org.wildfly.security.auth.principal.NamePrincipal;
 import org.wildfly.security.auth.realm.JaasSecurityRealm;
 import org.wildfly.security.auth.server.ModifiableRealmIdentity;
@@ -59,31 +82,6 @@ import org.wildfly.security.password.spec.DigestPasswordAlgorithmSpec;
 import org.wildfly.security.password.spec.EncryptablePasswordSpec;
 import org.wildfly.security.password.spec.IteratedSaltedPasswordAlgorithmSpec;
 import org.wildfly.security.password.spec.OneTimePasswordSpec;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.security.AccessController;
-import java.security.Principal;
-import java.security.PrivilegedAction;
-import java.security.Provider;
-import java.security.Security;
-import java.security.spec.KeySpec;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
-import static org.junit.Assert.assertFalse;
 
 /**
  * @author <a href="mailto:jkalina@redhat.com">Jan Kalina</a>
@@ -356,6 +354,29 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         identity_empty.delete();
         Assert.assertFalse(identity_empty.exists());
         identity_empty.dispose();
+    }
+
+    /**
+     * Test the signature of the filesystem realm when enabling integrity support
+     */
+    @Test
+    public void testFilesystemRealmIntegrity() throws Exception {
+        KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+        if (!services.isSuccessfulBoot()) {
+            Assert.fail(services.getBootError().toString());
+        }
+
+        ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("FilesystemRealmIntegrity");
+        ModifiableSecurityRealm securityRealm = (ModifiableSecurityRealm) services.getContainer().getService(serviceName).getValue();
+
+        // Test Clear Encrypted Password
+        Assert.assertNotNull(securityRealm);
+        char[] password = "password".toCharArray();
+        RealmIdentity identity_clear = securityRealm.getRealmIdentity(fromName("user"));
+        Assert.assertTrue(identity_clear.exists());
+        Assert.assertTrue(identity_clear.verifyEvidence(new PasswordGuessEvidence(password)));
+        Assert.assertFalse(identity_clear.verifyEvidence(new PasswordGuessEvidence("secretPassword123".toCharArray())));
+        identity_clear.dispose();
     }
 
 

@@ -4,8 +4,8 @@
         <provider-loader name="elytron" class-names="org.wildfly.security.WildFlyElytronProvider" />
     </providers>
     <security-realms>
-        <aggregate-realm name="AggregateRealmOne" authentication-realm="FilesystemRealm" authorization-realm="FilesystemRealm2"/>
-        <aggregate-realm name="AggregateRealmTwo" authentication-realm="FilesystemRealm" authorization-realm="FilesystemRealm2" principal-transformer ="RegexOne"/>
+<!--        <aggregate-realm name="AggregateRealmOne" authentication-realm="FilesystemRealm" authorization-realm="FilesystemRealm2"/>-->
+<!--        <aggregate-realm name="AggregateRealmTwo" authentication-realm="FilesystemRealm" authorization-realm="FilesystemRealm2" principal-transformer ="RegexOne"/>-->
 
         <properties-realm name="HashedPropertyRealm">
             <users-properties path="target/test-classes/org/wildfly/extension/elytron/users-hashed.properties" digest-realm-name="Hashed" />
@@ -24,45 +24,49 @@
             <groups-properties path="groups.properties" relative-to="jboss.server.config.dir" />
         </properties-realm>
 
-        <filesystem-realm name="FilesystemRealm" levels="2" encoded="false">
-            <file path="filesystem-realm" relative-to="jboss.server.config.dir" />
+<!--        <filesystem-realm name="FilesystemRealm" levels="2" encoded="false">-->
+<!--            <file path="filesystem-realm" relative-to="jboss.server.config.dir" />-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealm2" levels="2" encoded="false">-->
+<!--            <file path="filesystem-realm-2" relative-to="jboss.server.config.dir" />-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealm3" levels="1" encoded="true" hash-encoding="hex">-->
+<!--            <file path="filesystem-realm-3" relative-to="jboss.server.config.dir" />-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealm4" levels="1" encoded="true" hash-encoding="hex" hash-charset="GB2312">-->
+<!--            <file path="filesystem-realm-4" relative-to="jboss.server.config.dir"/>-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealm5" levels="1" encoded="false" credential-store="secretkeycredentialstore" secret-key="key">-->
+<!--            <file path="filesystem-realm-5" relative-to="jboss.server.config.dir"/>-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealm6" levels="1" encoded="false" credential-store="secretkeycredstore" secret-key="key">-->
+<!--            <file path="filesystem-realm-6" relative-to="jboss.server.config.dir"/>-->
+<!--        </filesystem-realm>-->
+
+<!--        <filesystem-realm name="FilesystemRealmExpression" levels="1" encoded="false" credential-store="${exp.credential-store:secretkeycredstore}" secret-key="${exp.secret-key:key}">-->
+<!--            <file path="filesystem-realm-expression" relative-to="jboss.server.config.dir"/>-->
+<!--        </filesystem-realm>-->
+
+        <filesystem-realm name="FilesystemRealmIntegrity" levels="1" encoded="true" key-store="keystore" key-store-alias="localhost">
+            <file path="filesystem-realm-integrity" relative-to="jboss.server.config.dir"/>
         </filesystem-realm>
 
-        <filesystem-realm name="FilesystemRealm2" levels="2" encoded="false">
-            <file path="filesystem-realm-2" relative-to="jboss.server.config.dir" />
-        </filesystem-realm>
+<!--        <token-realm name="JwtRealm" principal-claim="sub">-->
+<!--            <jwt issuer="some-issuer-a some-issuer-b" audience="some-audience-a some-audience-b some-audience-c" public-key="-&#45;&#45;&#45;&#45;BEGIN PUBLIC KEY-&#45;&#45;&#45;&#45;MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB-&#45;&#45;&#45;&#45;END PUBLIC KEY-&#45;&#45;&#45;&#45;"/>-->
+<!--        </token-realm>-->
 
-        <filesystem-realm name="FilesystemRealm3" levels="1" encoded="true" hash-encoding="hex">
-            <file path="filesystem-realm-3" relative-to="jboss.server.config.dir" />
-        </filesystem-realm>
+<!--        <token-realm name="EmptyJwtRealm" principal-claim="sub">-->
+<!--            <jwt/>-->
+<!--        </token-realm>-->
 
-        <filesystem-realm name="FilesystemRealm4" levels="1" encoded="true" hash-encoding="hex" hash-charset="GB2312">
-            <file path="filesystem-realm-4" relative-to="jboss.server.config.dir"/>
-        </filesystem-realm>
-
-        <filesystem-realm name="FilesystemRealm5" levels="1" encoded="false" credential-store="secretkeycredentialstore" secret-key="key">
-            <file path="filesystem-realm-5" relative-to="jboss.server.config.dir"/>
-        </filesystem-realm>
-
-        <filesystem-realm name="FilesystemRealm6" levels="1" encoded="false" credential-store="secretkeycredstore" secret-key="key">
-            <file path="filesystem-realm-6" relative-to="jboss.server.config.dir"/>
-        </filesystem-realm>
-
-        <filesystem-realm name="FilesystemRealmExpression" levels="1" encoded="false" credential-store="${exp.credential-store:secretkeycredstore}" secret-key="${exp.secret-key:key}">
-            <file path="filesystem-realm-expression" relative-to="jboss.server.config.dir"/>
-        </filesystem-realm>
-
-        <token-realm name="JwtRealm" principal-claim="sub">
-            <jwt issuer="some-issuer-a some-issuer-b" audience="some-audience-a some-audience-b some-audience-c" public-key="-----BEGIN PUBLIC KEY-----MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB-----END PUBLIC KEY-----"/>
-        </token-realm>
-
-        <token-realm name="EmptyJwtRealm" principal-claim="sub">
-            <jwt/>
-        </token-realm>
-
-        <token-realm name="JwtWithKeyStore">
-            <jwt key-store="ElytronCaTruststore" certificate="mykey" />
-        </token-realm>
+<!--        <token-realm name="JwtWithKeyStore">-->
+<!--            <jwt key-store="ElytronCaTruststore" certificate="mykey" />-->
+<!--        </token-realm>-->
 
         <token-realm name="OAuth2Realm" principal-claim="sub">
             <oauth2-introspection client-id="a" client-secret="b" introspection-url="https://localhost/token/introspect" client-ssl-context="ClientCaSslContext" host-name-verification-policy="ANY" />
@@ -84,6 +88,11 @@
                 <credential-reference clear-text="Elytron"/>
                 <implementation type="JKS" />
                 <file path="target/test-classes/org/wildfly/extension/elytron/ca.truststore"/>
+            </key-store>
+            <key-store name="keystore">
+                <credential-reference clear-text="secret"/>
+                <implementation type="JKS"/>
+                <file path="target/test-classes/org/wildfly/extension/elytron/keystore"/>
             </key-store>
         </key-stores>
         <trust-managers>

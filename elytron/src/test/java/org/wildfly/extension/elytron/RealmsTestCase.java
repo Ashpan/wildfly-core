@@ -358,6 +358,86 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         identity_empty.dispose();
     }
 
+    /**
+     * Test the signature of the filesystem realm when enabling integrity support
+     */
+    @Test
+    public void testFilesystemRealmIntegrity() throws Exception {
+        KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+        if (!services.isSuccessfulBoot()) {
+            Assert.fail(services.getBootError().toString());
+        }
+
+        ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("FilesystemRealm5");
+        ModifiableSecurityRealm securityRealm = (ModifiableSecurityRealm) services.getContainer().getService(serviceName).getValue();
+        ServiceName serviceName_randomKey = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("FilesystemRealm6");
+        ModifiableSecurityRealm securityRealm_randomKey = (ModifiableSecurityRealm) services.getContainer().getService(serviceName_randomKey).getValue();
+
+        // Test Clear Encrypted Password
+        Assert.assertNotNull(securityRealm);
+        char[] password = "secretPassword".toCharArray();
+        RealmIdentity identity_clear = securityRealm.getRealmIdentity(fromName("plainUser"));
+        Assert.assertTrue(identity_clear.exists());
+        Assert.assertTrue(identity_clear.verifyEvidence(new PasswordGuessEvidence(password)));
+        Assert.assertFalse(identity_clear.verifyEvidence(new PasswordGuessEvidence("secretPassword123".toCharArray())));
+        identity_clear.dispose();
+
+        // Test BCrypt Hashed Encrypted Password
+        RealmIdentity identity_bcrypt = securityRealm.getRealmIdentity(fromName("plainUser1"));
+        Assert.assertTrue(identity_bcrypt.exists());
+        Assert.assertTrue(identity_bcrypt.verifyEvidence(new PasswordGuessEvidence(password)));
+        Assert.assertFalse(identity_bcrypt.verifyEvidence(new PasswordGuessEvidence("secretPassword123".toCharArray())));
+        identity_bcrypt.dispose();
+
+        // Test encrypted attributes
+        MapAttributes newAttributes = new MapAttributes();
+        newAttributes.addFirst("name", "plainUser");
+        newAttributes.addAll("roles", Arrays.asList("Employee", "Manager", "Admin"));
+
+        RealmIdentity identity_attribute = securityRealm.getRealmIdentity(fromName("attributeUser"));
+        Assert.assertTrue(identity_attribute.exists());
+        AuthorizationIdentity authorizationIdentity = identity_attribute.getAuthorizationIdentity();
+        Attributes existingAttributes = authorizationIdentity.getAttributes();
+        identity_attribute.dispose();
+
+        assertEquals(newAttributes.size(), existingAttributes.size());
+        assertTrue(newAttributes.get("name").containsAll(existingAttributes.get("name")));
+        assertTrue(newAttributes.get("roles").containsAll(existingAttributes.get("roles")));
+
+        // Test OTP and BCrypt Encrypted Passwords
+        RealmIdentity identity_everything = securityRealm.getRealmIdentity(fromName("plainUserEverything"));
+        byte[] hash = CodePointIterator.ofString("505d889f90085847").hexDecode().drain();
+        String seed = "ke1234";
+        Assert.assertTrue(identity_everything.exists());
+        Assert.assertTrue(identity_everything.verifyEvidence(new PasswordGuessEvidence(password)));
+        OneTimePassword otp = identity_everything.getCredential(PasswordCredential.class, OneTimePassword.ALGORITHM_OTP_SHA1).getPassword(OneTimePassword.class);
+        assertNotNull(otp);
+        assertEquals(OneTimePassword.ALGORITHM_OTP_SHA1, otp.getAlgorithm());
+        assertArrayEquals(hash, otp.getHash());
+        assertEquals(seed, otp.getSeed());
+        identity_everything.dispose();
+
+        // Test creating new encrypted realm with identity
+        List<Credential> credentials = new LinkedList<>();
+        PasswordFactory factory = PasswordFactory.getInstance(ClearPassword.ALGORITHM_CLEAR);
+        ClearPassword clearPassword = (ClearPassword) factory.generatePassword(new ClearPasswordSpec(password));
+        credentials.add(new PasswordCredential(clearPassword));
+
+        ModifiableRealmIdentity identity_empty = securityRealm_randomKey.getRealmIdentityForUpdate(fromName("emptyIdentity"));
+        Assert.assertFalse(identity_empty.exists());
+        identity_empty.create();
+        Assert.assertTrue(identity_empty.exists());
+        identity_empty.setCredentials(credentials);
+        identity_empty.dispose();
+
+        ModifiableRealmIdentity identity_empty_2 = securityRealm_randomKey.getRealmIdentityForUpdate(fromName("emptyIdentity"));
+        Assert.assertTrue(identity_empty_2.exists());
+        Assert.assertTrue(identity_empty_2.verifyEvidence(new PasswordGuessEvidence(password)));
+        identity_empty.delete();
+        Assert.assertFalse(identity_empty.exists());
+        identity_empty.dispose();
+    }
+
 
 
     private void testAbstractFilesystemRealm(SecurityRealm securityRealm, String username, String password) throws Exception {

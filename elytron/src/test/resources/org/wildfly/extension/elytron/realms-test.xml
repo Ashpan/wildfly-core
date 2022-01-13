@@ -48,6 +48,10 @@
             <file path="filesystem-realm-6" relative-to="jboss.server.config.dir"/>
         </filesystem-realm>
 
+        <filesystem-realm name="FilesystemRealmIntegrity" key-store="keystore" key-store-alias="localhost">
+            <file path="filesystem-realm-integrity" relative-to="jboss.server.config.dir"/>
+        </filesystem-realm>
+
         <filesystem-realm name="FilesystemRealmExpression" levels="1" encoded="false" credential-store="${exp.credential-store:secretkeycredstore}" secret-key="${exp.secret-key:key}">
             <file path="filesystem-realm-expression" relative-to="jboss.server.config.dir"/>
         </filesystem-realm>

@@ -260,6 +260,11 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                 keyStoreRuntimeCapability = buildDynamicCapabilityName(KEY_STORE_CAPABILITY, keyStoreName);
                 keyStoreServiceName = context.getCapabilityServiceName(keyStoreRuntimeCapability, KeyStore.class);
             }
+            ServiceBuilder<?> serviceBuilder = serviceTarget.addService(mainServiceName);
+            if (keyStoreName != null) {
+                serviceBuilder.requires(keyStoreServiceName);
+            }
+            serviceBuilder.install();
             TrivialService<SecurityRealm> fileSystemRealmService = new TrivialService<>(
                     new TrivialService.ValueSupplier<SecurityRealm>() {
 
@@ -327,7 +332,7 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
 
                     });
 
-            ServiceBuilder<SecurityRealm> serviceBuilder = serviceTarget.addService(mainServiceName, fileSystemRealmService)
+            serviceBuilder = serviceTarget.addService(mainServiceName, fileSystemRealmService)
                     .addAliases(aliasServiceName);
 //            ServiceBuilder<SecurityRealm> serviceBuilder = serviceTarget.addService(mainServiceName, fileSystemRealmService)
 //                    .addAliases(aliasServiceName);
@@ -343,9 +348,9 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
 //            if (keyStore != null) {
 //                serviceBuilder.addDependency(context.getCapabilityServiceName(keyStoreRuntimeCapability, KeyStore.class), KeyStore.class, keyStoreInjector);
 //            }
-            if (keyStoreName != null) {
-                serviceBuilder.requires(keyStoreServiceName);
-            }
+//            if (keyStoreName != null) {
+//                serviceBuilder.requires(keyStoreServiceName);
+//            }
 
             if (relativeTo != null) {
                 serviceBuilder.addDependency(PathManagerService.SERVICE_NAME, PathManager.class, pathManagerInjector);

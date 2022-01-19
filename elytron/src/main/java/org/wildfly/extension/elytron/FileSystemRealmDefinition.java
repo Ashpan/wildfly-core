@@ -234,7 +234,7 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             final String hashEncoding = HASH_ENCODING.resolveModelAttribute(context, model).asString();
             final String hashCharset = HASH_CHARSET.resolveModelAttribute(context, model).asString();
             final String credentialStore = CREDENTIAL_STORE.resolveModelAttribute(context, model).asStringOrNull();
-            final String secretKey = SECRET_KEY.resolveModelAttribute(context, model).asStringOrNull();
+            final String secretKeyName = SECRET_KEY.resolveModelAttribute(context, model).asStringOrNull();
             final String keyStoreName = KEY_STORE.resolveModelAttribute(context, model).asStringOrNull();
             final String keyPairAlias = KEY_STORE_ALIAS.resolveModelAttribute(context, model).asStringOrNull();
 
@@ -242,11 +242,16 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             final InjectedValue<PathManager> pathManagerInjector = new InjectedValue<>();
             final InjectedValue<NameRewriter> nameRewriterInjector = new InjectedValue<>();
 
-            SecretKey key = null;
-            if (credentialStore != null && secretKey != null) {
-                key = getSecretKey(context, credentialStore, secretKey);
+            SecretKey secretKey = null;
+            if (credentialStore != null && secretKeyName != null) {
+                try {
+                    secretKey = getSecretKey(context, credentialStore, secretKeyName);
+                } catch (Exception e) {
+                    System.err.println("ERROR");
+                }
             }
-            SecretKey finalKey = key;
+            SecretKey finalSecretKey = secretKey;
+
             ServiceRegistry keyStoreServiceRegistry = context.getServiceRegistry(true);
 
             TrivialService<SecurityRealm> fileSystemRealmService = new TrivialService<>(
@@ -287,8 +292,8 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                                     .setHashEncoding(encoding)
                                     .setHashCharset(charset);
 
-                            if (finalKey != null) {
-                                fileSystemRealmBuilder.setSecretKey(finalKey);
+                            if (finalSecretKey != null) {
+                                fileSystemRealmBuilder.setSecretKey(finalSecretKey);
                             }
 
                             if (privateKey != null && publicKey != null) {

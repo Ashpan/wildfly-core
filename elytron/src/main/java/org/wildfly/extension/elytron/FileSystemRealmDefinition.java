@@ -53,7 +53,9 @@ import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ResourceDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
+import org.jboss.as.controller.SimpleOperationDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
+import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
 import org.jboss.as.controller.operations.validation.CharsetValidator;
 import org.jboss.as.controller.operations.validation.StringAllowedValuesValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
@@ -194,6 +196,14 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
         }
     }
 
+    @Override
+    public void registerOperations(ManagementResourceRegistration resourceRegistration) {
+        super.registerOperations(resourceRegistration);
+        ResourceDescriptionResolver resolver = ElytronExtension.getResourceDescriptionResolver(ElytronDescriptionConstants.FILESYSTEM_REALM);
+            // Create an account with the certificate authority
+            operationHandler.register(resourceRegistration, resolver);
+    }
+
     private static class RealmAddHandler extends BaseAddHandler {
 
         private RealmAddHandler() {
@@ -330,6 +340,26 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
                 serviceBuilder.requires(pathName(relativeTo));
             }
             serviceBuilder.install();
+        }
+
+        static class operationHandler extends ElytronReloadRequiredWriteAttributeHandler {
+
+            static void register(ManagementResourceRegistration resourceRegistration, ResourceDescriptionResolver descriptionResolver) {
+                resourceRegistration.registerOperationHandler(
+                        new SimpleOperationDefinitionBuilder(ElytronDescriptionConstants.CHANGE_ACCOUNT_KEY, descriptionResolver)
+                                .setParameters(STAGING)
+                                .setRuntimeOnly()
+                                .build(),
+                        new CertificateAuthorityAccountDefinition.ChangeAccountKeyHandler());
+            }
+
+            @Override
+            protected boolean applyUpdateToRuntime(OperationContext context, ModelNode operation, String attributeName, ModelNode resolvedValue,
+                                                   ModelNode currentValue, HandbackHolder<Void> handbackHolder) throws OperationFailedException {
+
+                return true;
+            }
+
         }
 
     }

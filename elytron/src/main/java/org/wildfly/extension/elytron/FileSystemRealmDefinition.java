@@ -28,13 +28,18 @@ import static org.wildfly.extension.elytron.Capabilities.SECURITY_REALM_RUNTIME_
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.BASE64;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.HEX;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.UTF_8;
+import static org.wildfly.extension.elytron.ElytronExtension.getRequiredService;
+//import static org.wildfly.extension.elytron.ElytronExtension.isServerOrHostController;
+import static org.wildfly.extension.elytron.ElytronExtension.isServerOrHostController;
 import static org.wildfly.extension.elytron.FileAttributeDefinitions.pathName;
 import static org.wildfly.extension.elytron.FileAttributeDefinitions.pathResolver;
 import static org.wildfly.extension.elytron.KeyStoreServiceUtil.getModifiableKeyStoreService;
 import static org.wildfly.extension.elytron._private.ElytronSubsystemMessages.ROOT_LOGGER;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -49,11 +54,14 @@ import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
+import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ResourceDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
+import org.jboss.as.controller.SimpleOperationDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
+import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
 import org.jboss.as.controller.operations.validation.CharsetValidator;
 import org.jboss.as.controller.operations.validation.StringAllowedValuesValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
@@ -63,7 +71,9 @@ import org.jboss.as.controller.services.path.PathManager;
 import org.jboss.as.controller.services.path.PathManagerService;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
+import org.jboss.msc.Service;
 import org.jboss.msc.service.ServiceBuilder;
+import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
@@ -190,6 +200,37 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
         AbstractWriteAttributeHandler handler = new ElytronReloadRequiredWriteAttributeHandler(ATTRIBUTES);
         for (AttributeDefinition attr : ATTRIBUTES) {
             resourceRegistration.registerReadWriteAttribute(attr, null, handler);
+        }
+    }
+
+    @Override
+    public void registerOperations(ManagementResourceRegistration resourceRegistration) {
+        super.registerOperations(resourceRegistration);
+        ResourceDescriptionResolver resolver = ElytronExtension.getResourceDescriptionResolver(ElytronDescriptionConstants.FILESYSTEM_REALM);
+        if (isServerOrHostController(resourceRegistration)) { // server-only operations
+            ChangeKeyPairHandler.register(resourceRegistration, resolver);
+        }
+    }
+
+    static class ChangeKeyPairHandler extends ElytronRuntimeOnlyHandler {
+
+        static void register(ManagementResourceRegistration resourceRegistration, ResourceDescriptionResolver descriptionResolver) {
+            resourceRegistration.registerOperationHandler(
+                    new SimpleOperationDefinitionBuilder(ElytronDescriptionConstants.CHANGE_KEYSTORE, descriptionResolver)
+                            .setRuntimeOnly()
+                            .build(),
+                    new FileSystemRealmDefinition.ChangeKeyPairHandler());
+        }
+
+        @Override
+        protected void executeRuntimeStep(final OperationContext context, final ModelNode operation) throws OperationFailedException {
+            TrivialService<FileSystemSecurityRealm> filesystemService = (TrivialService<FileSystemSecurityRealm>) getFileSystemService(context);
+            FileSystemSecurityRealm fileSystemRealm = filesystemService.getValue();
+            try {
+                fileSystemRealm.updateRealmKeyPair();
+            } catch (IOException | GeneralSecurityException e) {
+                throw ROOT_LOGGER.unableToUpdateFilesystemKeystore(e, e.getLocalizedMessage());
+            }
         }
     }
 
@@ -332,6 +373,20 @@ class FileSystemRealmDefinition extends SimpleResourceDefinition {
             serviceBuilder.install();
         }
 
+    }
+
+    private static Service getFileSystemService(OperationContext context) throws OperationFailedException {
+        ServiceRegistry serviceRegistry = context.getServiceRegistry(true);
+        PathAddress currentAddress = context.getCurrentAddress();
+        ServiceName mainServiceName = MODIFIABLE_SECURITY_REALM_RUNTIME_CAPABILITY.fromBaseCapability(currentAddress.getLastElement().getValue()).getCapabilityServiceName();
+
+        ServiceController<SecurityRealm> serviceContainer = getRequiredService(serviceRegistry, mainServiceName, SecurityRealm.class);
+        ServiceController.State serviceState = serviceContainer.getState();
+//        if (serviceState != ServiceController.State.UP) {
+//            throw ROOT_LOGGER.requiredServiceNotUp(serviceName, serviceState);
+//        }
+
+        return serviceContainer.getService();
     }
 
 }

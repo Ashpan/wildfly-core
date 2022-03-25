@@ -696,6 +696,8 @@ public interface ElytronSubsystemMessages extends BasicLogger {
     @Message(id = 1212, value = "KeyStore does not contain a PublicKey and PrivateKey for KeyStore: [%s] and alias: [%s].")
     StartException invalidKeyPair(String keyStore, String alias);
 
+    @Message(id = 1213, value = "Unable to update the filesystem realm with the new keystore: %s")
+    OperationFailedException unableToUpdateFilesystemKeystore(@Cause Exception cause, String causeMessage);
     /*
      * Don't just add new errors to the end of the file, there may be an appropriate section above for the resource.
      *
